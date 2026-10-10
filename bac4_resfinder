@@ -1,0 +1,45 @@
+
+echo -e "\n注!这是每次都会出现的第三个提示, 当你指定了-s, 会使用resfider进行耐药注释, 并加入耐药基因变异位点以及消毒剂基因预测"
+
+echo -e "\n注!这是每次都会出现的第四个提示, -s支持的物种包括Campylobacter、Campylobacter coil、Campylobacter jejuni、Enterococcus faecalis、Enterococcus faecium、\
+Escherichia coli、Helicobacter pylori、Klebsiella、Mycobacterium tuberculosis、Neisseria gonorrhoeae、Plasmodium falciparum、Salmonella、Staphylococcus aureus"
+
+
+echo -e "\n注!这是每次都会出现的第六个提示, resfinder地址: https://bitbucket.org/genomicepidemiology/resfinder"
+
+
+
+
+# 7.1 耐药(resfinder)基因预测
+    echo -e "\n$(date '+%Y-%m-%d %H:%M:%S') 耐药基因(resfinder)预测开始"
+
+    mkdir -p $OUTPUT_DIR/resfinder/temp
+    mkdir -p $OUTPUT_DIR/resfinder/result
+    mkdir -p $OUTPUT_DIR/resfinder/point
+    mkdir -p $OUTPUT_DIR/resfinder/disin
+
+    docker run --rm -v $INPUT_DIR:$INPUT_DIR -v $OUTPUT_DIR:$OUTPUT_DIR --entrypoint /bin/bash resfinder:v4.7.2 \
+    -c "cd $INPUT_DIR && \
+    for file in $INPUT_DIR/*.fasta ; do 
+        filename=\$(basename \$file .fasta)
+        mkdir $OUTPUT_DIR/resfinder/temp/\$filename
+        python -m resfinder -ifa \$file -o $OUTPUT_DIR/resfinder/temp/\$filename -s "$SPECIES" --acquired --point --threshold 0.9 --min_cov 0.9 --disinfectant
+        cp $OUTPUT_DIR/resfinder/temp/\$filename/ResFinder_results_tab.txt $OUTPUT_DIR/resfinder/result/\${filename}_resfinder.tab
+        cp $OUTPUT_DIR/resfinder/temp/\$filename/PointFinder_results.txt $OUTPUT_DIR/resfinder/point/\${filename}_pointfinder.tab
+        cp $OUTPUT_DIR/resfinder/temp/\$filename/DisinFinder_results_tab.txt $OUTPUT_DIR/resfinder/disin/\${filename}_disinfinder.tab
+    done"
+
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') 耐药基因(resfinder)预测成功"
+
+fi
+
+# 8. 移除bedtools索引
+docker run --rm -v $INPUT_DIR:$INPUT_DIR abricate:v1.2 rm -rf $INPUT_DIR/*.fai
+
+# 9. 检查所有分析结果
+if  [[ -s  $OUTPUT_DIR/card/tab/1AMatrix_card.tab ]] || [[ -s $OUTPUT_DIR/vfdb/tab/1AMatrix_vfdb.tab ]] || \
+    [[ -s  $OUTPUT_DIR/plasmidfinder/tab/1AMatrix_plasmid.tab ]] ; then
+	echo -e "\n$(date '+%Y-%m-%d %H:%M:%S') 全部样本分析成功"
+else
+	echo -e "\n任务运行失败"
+fi
